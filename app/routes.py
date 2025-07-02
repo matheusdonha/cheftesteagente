@@ -15,12 +15,19 @@ def webhook():
         chat_id = data['message']['chat']['id']
         mensagem = data['message'].get('text', '')
 
-        inserir_mensagem(chat_id, "user", mensagem)
-        historico = buscar_historico(chat_id)
-        resposta = gerar_resposta(historico)
-        inserir_mensagem(chat_id, "assistant", resposta)
+        print(f"Chat ID: {chat_id}, Texto: {mensagem}", file=sys.stderr)
 
-        enviar_mensagem_telegram(chat_id, resposta)
+        try:
+            inserir_mensagem(chat_id, "user", mensagem)
+            historico = buscar_historico(chat_id)
+            resposta = gerar_resposta(historico)
+            inserir_mensagem(chat_id, "assistant", resposta)
+
+            print("Resposta gerada:", resposta, file=sys.stderr)
+            enviar_mensagem_telegram(chat_id, resposta)
+
+        except Exception as e:
+            print("Erro no processamento:", e, file=sys.stderr)
 
     return jsonify({"status": "ok"}), 200
 
