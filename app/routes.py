@@ -1,11 +1,30 @@
 from flask import request, jsonify
 from app import app
 from app.agent_logic import gerar_resposta
-from app.utils.helpers import inicializar_db,inserir_mensagem, buscar_historico, deletar_historico
+from app.utils.helpers import inicializar_db, inserir_mensagem,enviar_mensagem_telegram, buscar_historico, deletar_historico
 
 @app.route('/')
 def home():
     return jsonify('Agente - Chef de Cozinha')
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+
+    if "message" in data:
+        chat_id = data['message']['chat']['id']
+        mensagem = data['message'].get('text', '')
+
+        inserir_mensagem(chat_id, "user", mensagem)
+        historico = buscar_historico(chat_id)
+        resposta = gerar_resposta(historico)
+        inserir_mensagem(chat_id, "assistant", resposta)
+
+        enviar_mensagem_telegram(chat_id, resposta)
+
+    return jsonify({"status": "ok"}), 200
+
+
 
 
 @app.route('/responder', methods=['POST'])

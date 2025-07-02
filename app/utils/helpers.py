@@ -1,4 +1,6 @@
 import sqlite3
+import os
+import requests
 
 DB_PATH = "app/utils/historicomensagens.db"
 
@@ -17,6 +19,14 @@ def inicializar_db():
     con.close()
 
 inicializar_db()
+
+def enviar_mensagem_telegram(chat_id, texto):
+    token = os.getenv('TELEGRAM_TOKEN')
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id":chat_id , "text":texto}
+
+    response = requests.post(url, json=payload)
+
 
 def inserir_mensagem(user_id, role, messages):
     con=sqlite3.connect(DB_PATH)
