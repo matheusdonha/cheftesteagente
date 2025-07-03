@@ -4,9 +4,6 @@ from app import app
 from app.agent_logic import gerar_resposta
 from app.utils.helpers import inicializar_db, inserir_mensagem,enviar_mensagem_telegram, buscar_historico, deletar_historico
 
-@app.route('/')
-def home():
-    return jsonify('Agente - Chef de Cozinha')
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
