@@ -18,7 +18,7 @@ DB_PASSWORD = os.environ['SUPABASE_PASSWORD']
 # Adicionamos um try-except para a inicialização do pool, pois ela é crítica.
 
 try:
-    connection_pool= pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=f"host=db.ohwzezjffhjhetzsnjdd.supabase.co port=5432 dbname=postgres user=postgres password={DB_PASSWORD}")
+    connection_pool= pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=f"user=postgres.ohwzezjffhjhetzsnjdd password={DB_PASSWORD} host=aws-0-us-east-2.pooler.supabase.com port=5432 dbname=postgres ")
     print("Connection pool established")
 except Exception as e:
     print(f"ERRO: Não foi possível criar o pool de conexões do Supabase. Verifique a SUPABASE_URL. Erro: {e}")
