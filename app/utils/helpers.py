@@ -7,22 +7,8 @@ from urllib.parse import urlparse, quote_plus # Importe urlparse e quote_plus
 
 load_dotenv()  # Carrega variáveis de ambiente uma vez no início
 
-DB_URL = os.environ['SUPABASE_URL']
+
 DB_PASSWORD = os.environ['SUPABASE_PASSWORD']
-
-# Parse a URL para extrair os componentes
-result = urlparse(DB_URL)
-username = result.username
-# Senha agora vem da nova variável DB_PASSWORD
-# password = result.password # Não vamos mais usar a senha parseada da URL
-database = result.path[1:] # Remove a barra inicial
-hostname = result.hostname
-port = result.port
-
-db_connection_string = (
-    f"host={hostname} port={port} dbname={database} "
-    f"user={username} password={quote_plus(DB_PASSWORD)}" # Use quote_plus para garantir que a senha seja tratada corretamente
-)
 
 
 # Cria o pool de conexões
@@ -32,7 +18,7 @@ db_connection_string = (
 # Adicionamos um try-except para a inicialização do pool, pois ela é crítica.
 
 try:
-    connection_pool= pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=db_connection_string)
+    connection_pool= pool.SimpleConnectionPool(minconn=1, maxconn=10, dsn=f"host=db.ohwzezjffhjhetzsnjdd.supabase.co port=5432 dbname=postgres user=postgres password={DB_PASSWORD}")
     print("Connection pool established")
 except Exception as e:
     print(f"ERRO: Não foi possível criar o pool de conexões do Supabase. Verifique a SUPABASE_URL. Erro: {e}")
