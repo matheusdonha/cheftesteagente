@@ -1,187 +1,33 @@
-# web_routes.py - Interface web para o agente IA (VERSÃO COM CORES E TEXTO ATUALIZADOS)
-
 from flask import request, jsonify, render_template_string
 from datetime import datetime
 import logging
 import traceback
+import uuid  # Para gerar IDs de sessão únicos
 
-# Importar sua função do agente
+# Importar suas funções do agente e do helpers
 try:
     from app.agent_logic import gerar_resposta
-except ImportError:
-    # Função de fallback caso o módulo não exista
+    from app.utils.helpers import inserir_mensagem, buscar_historico, deletar_historico
+except ImportError as e:
+    logging.error(f"Erro ao importar módulos essenciais: {e}. Funções de DB e agente podem não estar disponíveis.")
+
+
+    # Fallback functions if essential modules are missing
     def gerar_resposta(historico):
-        return "Olá! Sou seu agente IA. Como posso ajudá-lo hoje?"
-
-# Histórico de chat em memória para a interface web
-web_chat_sessions = {}
+        return "Olá! Sou seu agente IA (modo fallback). Ocorreu um problema na inicialização. Como posso ajudar hoje?"
 
 
-def register_web_routes(app):
-    """Registra as rotas da interface web no app Flask"""
+    def inserir_mensagem(user_id, role, messages):
+        logging.warning(f"Tentativa de inserir mensagem sem DB: user_id={user_id}, role={role}, msg={messages[:50]}...")
 
-    @app.route('/')
-    def web_interface():
-        """Serve a interface web do chat"""
-        return render_template_string(WEB_CHAT_HTML)
 
-    @app.route('/api/chat', methods=['POST'])
-    def web_chat():
-        """Endpoint para receber mensagens da interface web"""
-        try:
-            # Verificar se o request tem JSON
-            if not request.is_json:
-                return jsonify({'error': 'Content-Type deve ser application/json'}), 400
+    def buscar_historico(user_id):
+        logging.warning(f"Tentativa de buscar histórico sem DB para user_id={user_id}.")
+        return []
 
-            data = request.get_json()
-            if not data:
-                return jsonify({'error': 'Dados JSON inválidos'}), 400
 
-            user_message = data.get('message', '').strip()
-            session_id = data.get('session_id', 'default')
-
-            if not user_message:
-                return jsonify({'error': 'Mensagem não pode estar vazia'}), 400
-
-            # Log da mensagem recebida
-            logging.info(f"Mensagem recebida na sessão {session_id}: {user_message[:100]}...")
-
-            # Inicializar sessão se não existir
-            if session_id not in web_chat_sessions:
-                web_chat_sessions[session_id] = []
-
-            # Adicionar mensagem do usuário ao histórico
-            web_chat_sessions[session_id].append({
-                'role': 'user',
-                'content': user_message,
-                'timestamp': datetime.now().isoformat()
-            })
-
-            # Preparar histórico no formato que sua função espera
-            historico_para_agente = []
-            for msg in web_chat_sessions[session_id]:
-                historico_para_agente.append({
-                    'role': msg['role'],
-                    'content': msg['content']
-                })
-
-            # Chamar sua função do agente com tratamento de erro
-            try:
-                bot_response = gerar_resposta(historico_para_agente)
-                if not bot_response:
-                    bot_response = "Desculpe, não consegui gerar uma resposta. Tente novamente."
-            except Exception as agent_error:
-                logging.error(f"Erro na função do agente: {str(agent_error)}")
-                bot_response = "Ocorreu um erro ao processar sua mensagem. Tente novamente."
-
-            # Adicionar resposta do bot ao histórico
-            web_chat_sessions[session_id].append({
-                'role': 'assistant',
-                'content': bot_response,
-                'timestamp': datetime.now().isoformat()
-            })
-
-            # Manter apenas últimas 100 mensagens por sessão
-            if len(web_chat_sessions[session_id]) > 100:
-                web_chat_sessions[session_id] = web_chat_sessions[session_id][-100:]
-
-            # Log da resposta
-            logging.info(f"Resposta enviada para sessão {session_id}: {bot_response[:100]}...")
-
-            return jsonify({
-                'response': bot_response,
-                'timestamp': datetime.now().isoformat(),
-                'status': 'success'
-            })
-
-        except Exception as e:
-            error_msg = str(e)
-            error_trace = traceback.format_exc()
-            logging.error(f"Erro no chat web: {error_msg}\nTraceback: {error_trace}")
-
-            return jsonify({
-                'error': f'Erro interno do servidor: {error_msg}',
-                'status': 'error'
-            }), 500
-
-    @app.route('/api/history', methods=['GET'])
-    def get_chat_history():
-        """Retorna histórico da conversa"""
-        try:
-            session_id = request.args.get('session_id', 'default')
-
-            if session_id not in web_chat_sessions:
-                return jsonify({'history': [], 'total': 0})
-
-            # Formatar histórico para o frontend
-            formatted_history = []
-            for msg in web_chat_sessions[session_id]:
-                if msg['role'] == 'user':
-                    formatted_history.append({
-                        'user': msg['content'],
-                        'timestamp': msg['timestamp']
-                    })
-                else:
-                    formatted_history.append({
-                        'bot': msg['content'],
-                        'timestamp': msg['timestamp']
-                    })
-
-            return jsonify({
-                'history': formatted_history,
-                'total': len(formatted_history)
-            })
-        except Exception as e:
-            logging.error(f"Erro ao obter histórico: {str(e)}")
-            return jsonify({'error': 'Erro ao carregar histórico', 'history': [], 'total': 0}), 500
-
-    @app.route('/api/clear', methods=['POST'])
-    def clear_chat_history():
-        """Limpa o histórico de conversas"""
-        try:
-            data = request.get_json() or {}
-            session_id = data.get('session_id', 'default')
-
-            if session_id in web_chat_sessions:
-                web_chat_sessions[session_id] = []
-                logging.info(f"Histórico da sessão {session_id} limpo")
-
-            return jsonify({
-                'message': 'Histórico limpo com sucesso',
-                'status': 'success'
-            })
-        except Exception as e:
-            logging.error(f"Erro ao limpar histórico: {str(e)}")
-            return jsonify({'error': 'Erro ao limpar histórico', 'status': 'error'}), 500
-
-    @app.route('/api/status', methods=['GET'])
-    def get_status():
-        """Endpoint de status da aplicação"""
-        try:
-            return jsonify({
-                'status': 'online',
-                'timestamp': datetime.now().isoformat(),
-                'sessions_active': len(web_chat_sessions),
-                'total_messages': sum(len(session) for session in web_chat_sessions.values())
-            })
-        except Exception as e:
-            logging.error(f"Erro no status: {str(e)}")
-            return jsonify({'status': 'error', 'error': str(e)}), 500
-
-    # Endpoint adicional para debug
-    @app.route('/api/debug', methods=['GET'])
-    def debug_info():
-        """Informações de debug da aplicação"""
-        if app.debug:  # Só funciona em modo debug
-            return jsonify({
-                'sessions': list(web_chat_sessions.keys()),
-                'total_sessions': len(web_chat_sessions),
-                'flask_debug': app.debug,
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            return jsonify({'error': 'Debug não habilitado'}), 403
-
+    def deletar_historico(user_id):
+        logging.warning(f"Tentativa de deletar histórico sem DB para user_id={user_id}.")
 
 # HTML DA INTERFACE WEB - VERSÃO COM CORES E TEXTO ATUALIZADOS
 WEB_CHAT_HTML = """
@@ -626,7 +472,7 @@ WEB_CHAT_HTML = """
         </div>
 
         <div class="status-bar">
-            <span class="clear-btn" onclick="clearChat()">
+            <span class="clear-btn" onclick="window.chatInterface.clearChat()">
                 <span>🗑️</span>
                 <span>Limpar conversa</span>
             </span>
@@ -653,6 +499,7 @@ WEB_CHAT_HTML = """
                 this.isProcessing = false;
                 this.retryCount = 0;
                 this.maxRetries = 3;
+                this.sessionId = this.getOrCreateSessionId(); // Gerar/Obter ID da sessão
 
                 this.setupEventListeners();
                 this.loadHistory();
@@ -660,33 +507,47 @@ WEB_CHAT_HTML = """
                 this.enableDebugMode();
             }
 
+            // Gera ou obtém um UUID para a sessão do chat
+            getOrCreateSessionId() {
+                let id = localStorage.getItem('chatSessionId');
+                if (!id) {
+                    id = this.generateUuid();
+                    localStorage.setItem('chatSessionId', id);
+                    this.log('Novo session_id gerado:', id);
+                } else {
+                    this.log('Session_id existente:', id);
+                }
+                return id;
+            }
+
+            generateUuid() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
             setupEventListeners() {
-                // Evento de clique para o botão de enviar
                 this.sendButton.addEventListener('click', () => {
                     this.sendMessage();
                 });
 
-                // Evento de teclado para o campo de input
                 this.messageInput.addEventListener('keydown', (e) => {
-                    // Se a tecla Enter for pressionada e Shift NÃO estiver pressionado
                     if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault(); // Impede a nova linha padrão no textarea
-                        this.sendMessage(); // Envia a mensagem
+                        e.preventDefault();
+                        this.sendMessage();
                     }
                 });
 
-                // Auto-resize textarea
                 this.messageInput.addEventListener('input', () => {
                     this.messageInput.style.height = 'auto';
                     this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 150) + 'px';
                 });
 
-                // Focus no input ao carregar
                 setTimeout(() => {
                     this.messageInput.focus();
                 }, 100);
 
-                // Prevenir envio duplo com Ctrl+D
                 document.addEventListener('keydown', (e) => {
                     if (e.ctrlKey && e.key === 'd') {
                         e.preventDefault();
@@ -702,14 +563,12 @@ WEB_CHAT_HTML = """
                     return;
                 }
 
-                this.log(`Enviando mensagem: "${message}"`);
+                this.log(`Enviando mensagem: "${message}" para session_id: ${this.sessionId}`);
 
-                // Adicionar mensagem do usuário
                 this.addMessage(message, 'user');
                 this.messageInput.value = '';
-                this.messageInput.style.height = 'auto'; // Resetar altura após o envio
+                this.messageInput.style.height = 'auto';
 
-                // Mostrar indicador de digitação
                 this.showTyping();
                 this.setStatus('Processando...', '🤔');
                 this.setButtonLoading(true);
@@ -726,7 +585,7 @@ WEB_CHAT_HTML = """
                         },
                         body: JSON.stringify({  
                             message: message,
-                            session_id: 'default' // Usar uma session_id padrão para o frontend
+                            session_id: this.sessionId // Usar o sessionId dinâmico
                         })
                     });
 
@@ -754,7 +613,7 @@ WEB_CHAT_HTML = """
                     if (this.retryCount < this.maxRetries) {
                         this.retryCount++;
                         this.addMessage(`🔄 Tentativa ${this.retryCount}/${this.maxRetries}. Tentando novamente...`, 'error');
-                        setTimeout(() => this.sendMessage(), 2000); // Tenta novamente após 2 segundos
+                        setTimeout(() => this.sendMessage(), 2000);
                         return;
                     }
 
@@ -775,10 +634,9 @@ WEB_CHAT_HTML = """
                 contentDiv.textContent = content;
                 messageDiv.appendChild(contentDiv);
 
-                // Adicionar timestamp
                 const timeDiv = document.createElement('div');
                 timeDiv.className = 'message-time';
-                timeDiv.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'}); // Formato HH:MM
+                timeDiv.textContent = new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
                 messageDiv.appendChild(timeDiv);
 
                 this.chatMessages.appendChild(messageDiv);
@@ -838,36 +696,66 @@ WEB_CHAT_HTML = """
 
             async loadHistory() {
                 try {
-                    this.log('Carregando histórico...');
-                    // Adicione um timestamp para evitar cache do navegador na requisição do histórico
-                    const response = await fetch(`/api/history?session_id=default&_=${new Date().getTime()}`);
+                    this.log(`Carregando histórico para session_id: ${this.sessionId}...`);
+                    const response = await fetch(`/api/history?session_id=${this.sessionId}&_=${new Date().getTime()}`);
                     const data = await response.json();
 
-                    if (data.history && data.history.length > 0) {
-                        this.chatMessages.innerHTML = ''; // Limpa a mensagem inicial
-                        // Adiciona a mensagem de boas-vindas inicial novamente se o histórico não a tiver
-                        if (!data.history.some(msg => msg.bot && msg.bot.includes('Olá! Sou seu agente IA inteligente'))) {
-                            const welcomeMessage = document.createElement('div');
-                            welcomeMessage.className = 'message bot fade-in';
-                            welcomeMessage.innerHTML = '👋 Olá! Sou seu agente IA inteligente. Posso ajudá-lo com diversas tarefas. Como posso ajudá-lo hoje?';
-                            this.chatMessages.appendChild(welcomeMessage);
-                        }
+                    this.chatMessages.innerHTML = ''; // Limpa tudo antes de carregar
 
+                    // Adiciona a mensagem de boas-vindas inicial, mesmo se houver histórico.
+                    // Ou você pode optar por adicioná-la apenas se o histórico estiver vazio.
+                    this.addMessage('👋 Olá! Sou seu agente IA inteligente. Posso ajudá-lo com diversas tarefas. Como posso ajudá-lo hoje?', 'bot');
+
+                    if (data.history && data.history.length > 0) {
                         data.history.forEach(item => {
-                            if (item.user) {
-                                this.addMessage(item.user, 'user');
-                            }
-                            if (item.bot) {
-                                this.addMessage(item.bot, 'bot');
+                            if (item.role === 'user') { // Agora o backend retorna 'role'
+                                this.addMessage(item.content, 'user');
+                            } else if (item.role === 'assistant') { // Agora o backend retorna 'role'
+                                this.addMessage(item.content, 'bot');
                             }
                         });
-
                         this.log(`Histórico carregado: ${data.history.length} mensagens`);
+                    } else {
+                        this.log('Nenhum histórico encontrado para esta sessão.');
                     }
                 } catch (error) {
                     this.log('Erro ao carregar histórico:', error);
+                    this.addMessage('Erro ao carregar histórico. Por favor, tente recarregar a página.', 'error');
                 } finally {
-                    this.scrollToBottom(); // Garante o scroll ao carregar
+                    this.scrollToBottom();
+                }
+            }
+
+            async clearChat() {
+                if (confirm('🗑️ Tem certeza que deseja limpar toda a conversa?\\n\\nEsta ação não pode ser desfeita.')) {
+                    try {
+                        this.log(`Limpando conversa para session_id: ${this.sessionId}...`);
+
+                        const response = await fetch('/api/clear', { 
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ session_id: this.sessionId })
+                        });
+
+                        const data = await response.json();
+                        this.log('Resposta do clear:', data);
+
+                        if (response.ok && data.status === 'success') {
+                            this.chatMessages.innerHTML = 
+                                '<div class="message bot fade-in">👋 Olá! Sou seu agente IA inteligente. Posso ajudá-lo com diversas tarefas. Como posso ajudá-lo hoje?</div>';
+                            this.setStatus('Conversa limpa', '✅');
+                            this.scrollToBottom();
+                        } else {
+                            this.setStatus('Erro ao limpar', '❌');
+                            this.addMessage('Erro ao limpar o histórico.', 'error');
+                        }
+                    } catch (error) {
+                        this.log('Erro ao limpar:', error);
+                        this.setStatus('Erro de conexão', '🔌');
+                        this.addMessage('Erro de conexão ao limpar o histórico.', 'error');
+                    }
                 }
             }
 
@@ -884,7 +772,7 @@ WEB_CHAT_HTML = """
                 this.debugInfo.style.display = this.debugMode ? 'block' : 'none';
                 this.log('Debug mode:', this.debugMode ? 'habilitado' : 'desabilitado');
                 if (this.debugMode) {
-                    this.debugInfo.innerHTML = ''; // Limpar logs ao ativar
+                    this.debugInfo.innerHTML = '';
                 }
             }
 
@@ -896,56 +784,34 @@ WEB_CHAT_HTML = """
 
                 if (this.debugMode && this.debugInfo) {
                     const logDiv = document.createElement('div');
-                    logDiv.textContent = logMessage + (data ? JSON.stringify(data) : ''); // Incluir dados no log de debug
+                    // Melhorar a exibição de dados para debug:
+                    let displayData = '';
+                    if (data !== null && typeof data === 'object') {
+                        try {
+                            displayData = JSON.stringify(data, null, 2); // Formata JSON
+                        } catch (e) {
+                            displayData = String(data); // Fallback para outros tipos
+                        }
+                    } else if (data !== null) {
+                        displayData = String(data);
+                    }
+
+                    logDiv.innerHTML = `${logMessage}<pre>${displayData}</pre>`; // Usar <pre> para formatar JSON
+                    logDiv.style.whiteSpace = 'pre-wrap'; // Preservar quebras de linha e espaços
+                    logDiv.style.wordBreak = 'break-all'; // Quebrar palavras longas
                     this.debugInfo.appendChild(logDiv);
 
-                    // Manter apenas últimas 20 mensagens de debug
                     while (this.debugInfo.children.length > 20) {
                         this.debugInfo.removeChild(this.debugInfo.firstChild);
                     }
 
-                    // Scroll para o final
                     this.debugInfo.scrollTop = this.debugInfo.scrollHeight;
                 }
             }
         }
 
-        async function clearChat() {
-            if (confirm('🗑️ Tem certeza que deseja limpar toda a conversa?\\n\\nEsta ação não pode ser desfeita.')) {
-                try {
-                    console.log('Limpando conversa...');
-
-                    const response = await fetch('/api/clear', { 
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ session_id: 'default' })
-                    });
-
-                    const data = await response.json();
-                    console.log('Resposta do clear:', data);
-
-                    if (response.ok && data.status === 'success') {
-                        document.getElementById('chatMessages').innerHTML = 
-                            '<div class="message bot fade-in">👋 Olá! Sou seu agente IA inteligente. Posso ajudá-lo com diversas tarefas. Como posso ajudá-lo hoje?</div>';
-                        document.getElementById('statusText').innerHTML = '<span>✅</span><span>Conversa limpa</span>';
-                        // Recarrega o histórico após a limpeza para ter a mensagem inicial
-                        if (window.chatInterface) {
-                            window.chatInterface.scrollToBottom();
-                        }
-                    } else {
-                        document.getElementById('statusText').innerHTML = '<span>❌</span><span>Erro ao limpar</span>';
-                    }
-                } catch (error) {
-                    console.error('Erro ao limpar:', error);
-                    document.getElementById('statusText').innerHTML = '<span>🔌</span><span>Erro de conexão</span>';
-                }
-            }
-        }
-
-        // Função para testar a conexão
-        async function testConnection() {
+        // Global functions for console testing (optional, but useful)
+        window.testConnection = async () => {
             try {
                 const response = await fetch('/api/status');
                 const data = await response.json();
@@ -955,10 +821,9 @@ WEB_CHAT_HTML = """
                 console.error('Erro no teste:', error);
                 alert('Erro ao testar conexão: ' + error.message);
             }
-        }
+        };
 
-        // Função para testar envio de mensagem
-        async function testMessage() {
+        window.testMessage = async () => {
             try {
                 const testMsg = 'Teste de mensagem - ' + new Date().toLocaleTimeString();
                 const response = await fetch('/api/chat', {
@@ -968,7 +833,7 @@ WEB_CHAT_HTML = """
                     },
                     body: JSON.stringify({
                         message: testMsg,
-                        session_id: 'test_debug' // Usar uma sessão diferente para o teste
+                        session_id: window.chatInterface.sessionId // Usar o ID da sessão atual
                     })
                 });
 
@@ -979,38 +844,32 @@ WEB_CHAT_HTML = """
                 console.error('Erro no teste:', error);
                 alert('Erro no teste: ' + error.message);
             }
-        }
-
-        // Adicionar funções de teste ao console
-        window.testConnection = testConnection;
-        window.testMessage = testMessage;
-        window.clearChat = clearChat; // Tornar clearChat global para onclick no HTML
+        };
 
         // Inicializar interface quando página carregar
         document.addEventListener('DOMContentLoaded', () => {
             console.log('Inicializando interface do chat...');
             window.chatInterface = new ChatInterface();
 
-            // Instruções no console
             console.log('🤖 Chat Interface carregada!');
             console.log('💡 Comandos disponíveis:');
-            console.log('    - testConnection(): Testa conexão com API');
-            console.log('    - testMessage(): Envia mensagem de teste');
+            console.log('    - window.testConnection(): Testa conexão com API');
+            console.log('    - window.testMessage(): Envia mensagem de teste');
+            console.log('    - window.chatInterface.clearChat(): Limpa o histórico de chat'); // Chamar via instância
             console.log('    - Ctrl+D: Alternar modo debug');
-            console.log('    - ?debug=true na URL: Habilitar debug');
+            console.log('    - Adicione ?debug=true na URL para iniciar em modo debug.');
         });
 
-        // Tratamento de erros globais
+        // Tratamento de erros globais (JavaScript)
         window.addEventListener('error', (event) => {
-            console.error('Erro global:', event.error);
+            console.error('Erro global JavaScript:', event.error);
             if (window.chatInterface) {
                 window.chatInterface.log('Erro JavaScript:', event.error.message);
             }
         });
 
-        // Tratamento de erros de promessas não tratadas
         window.addEventListener('unhandledrejection', (event) => {
-            console.error('Promise rejeitada:', event.reason);
+            console.error('Promise rejeitada JavaScript:', event.reason);
             if (window.chatInterface) {
                 window.chatInterface.log('Promise rejeitada:', event.reason);
             }
@@ -1019,3 +878,149 @@ WEB_CHAT_HTML = """
 </body>
 </html>
 """
+
+
+# web_chat_sessions foi removido, pois o histórico agora vem do Supabase
+
+def register_web_routes(app):
+    """Registra as rotas da interface web no app Flask"""
+
+    @app.route('/')
+    def web_interface():
+        """Serve a interface web do chat"""
+        return render_template_string(WEB_CHAT_HTML)
+
+    @app.route('/api/chat', methods=['POST'])
+    def web_chat():
+        """Endpoint para receber mensagens da interface web e interagir com o Supabase"""
+        try:
+            if not request.is_json:
+                return jsonify({'error': 'Content-Type deve ser application/json'}), 400
+
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'Dados JSON inválidos'}), 400
+
+            user_message = data.get('message', '').strip()
+            session_id = data.get('session_id')  # Agora esperamos um session_id do frontend
+
+            if not session_id:
+                return jsonify({'error': 'session_id é obrigatório'}), 400
+            if not user_message:
+                return jsonify({'error': 'Mensagem não pode estar vazia'}), 400
+
+            logging.info(f"WEB_CHAT: Mensagem recebida na sessão {session_id}: {user_message[:100]}...")
+
+            # 1. Inserir mensagem do usuário no Supabase
+            inserir_mensagem(session_id, "user", user_message)
+
+            # 2. Buscar histórico do Supabase
+            historico_para_agente = buscar_historico(session_id)
+
+            # Garantir que o histórico esteja no formato correto para o agente
+            # (buscar_historico já retorna no formato {"role": role, "content": msg})
+
+            # 3. Chamar sua função do agente com tratamento de erro
+            try:
+                bot_response = gerar_resposta(historico_para_agente)
+                if not bot_response:
+                    bot_response = "Desculpe, não consegui gerar uma resposta. Tente novamente."
+            except Exception as agent_error:
+                logging.error(
+                    f"WEB_CHAT: Erro na função do agente para sessão {session_id}: {str(agent_error)}\nTraceback: {traceback.format_exc()}")
+                bot_response = "Ocorreu um erro ao processar sua mensagem. Tente novamente."
+
+            # 4. Inserir resposta do bot no Supabase
+            inserir_mensagem(session_id, "assistant", bot_response)
+
+            logging.info(f"WEB_CHAT: Resposta enviada para sessão {session_id}: {bot_response[:100]}...")
+
+            return jsonify({
+                'response': bot_response,
+                'timestamp': datetime.now().isoformat(),
+                'status': 'success'
+            })
+
+        except Exception as e:
+            error_msg = str(e)
+            error_trace = traceback.format_exc()
+            logging.error(f"WEB_CHAT: Erro interno no chat web: {error_msg}\nTraceback: {error_trace}")
+            return jsonify({
+                'error': f'Erro interno do servidor: {error_msg}',
+                'status': 'error'
+            }), 500
+
+    @app.route('/api/history', methods=['GET'])
+    def get_chat_history():
+        """Retorna histórico da conversa do Supabase"""
+        try:
+            session_id = request.args.get('session_id')
+            if not session_id:
+                return jsonify({'error': 'session_id é obrigatório'}), 400
+
+            historico = buscar_historico(session_id)  # Busca direto do Supabase
+
+            # O formato já vem do DB como [{"role": role, "content": msg}]
+            # Não precisamos reformatar para o frontend como antes,
+            # o frontend vai precisar se adaptar para role/content
+
+            logging.info(f"WEB_CHAT: Histórico solicitado para sessão {session_id}. Total: {len(historico)} mensagens.")
+            return jsonify({
+                'history': historico,  # Envia o histórico como está do DB
+                'total': len(historico)
+            })
+        except Exception as e:
+            logging.error(
+                f"WEB_CHAT: Erro ao obter histórico para sessão {session_id}: {str(e)}\nTraceback: {traceback.format_exc()}")
+            return jsonify({'error': 'Erro ao carregar histórico', 'history': [], 'total': 0}), 500
+
+    @app.route('/api/clear', methods=['POST'])
+    def clear_chat_history():
+        """Limpa o histórico de conversas do Supabase"""
+        try:
+            data = request.get_json() or {}
+            session_id = data.get('session_id')
+
+            if not session_id:
+                return jsonify({'error': 'session_id é obrigatório'}), 400
+
+            deletar_historico(session_id)  # Deleta do Supabase
+            logging.info(f"WEB_CHAT: Histórico da sessão {session_id} limpo.")
+
+            return jsonify({
+                'message': 'Histórico limpo com sucesso',
+                'status': 'success'
+            })
+        except Exception as e:
+            logging.error(
+                f"WEB_CHAT: Erro ao limpar histórico para sessão {session_id}: {str(e)}\nTraceback: {traceback.format_exc()}")
+            return jsonify({'error': 'Erro ao limpar histórico', 'status': 'error'}), 500
+
+    @app.route('/api/status', methods=['GET'])
+    def get_status():
+        """Endpoint de status da aplicação"""
+        # Para um status mais preciso, idealmente verificar a conexão com o DB aqui.
+        # Por simplicidade, apenas retorna online se a rota for acessível.
+        try:
+            return jsonify({
+                'status': 'online',
+                'timestamp': datetime.now().isoformat(),
+                'note': 'Status básico, não reflete conexão ativa com DB ou OpenAI.',
+                # 'sessions_active': len(web_chat_sessions), # Removido, não é mais em memória
+                # 'total_messages': sum(len(session) for session in web_chat_sessions.values()) # Removido
+            })
+        except Exception as e:
+            logging.error(f"WEB_CHAT: Erro no endpoint de status: {str(e)}\nTraceback: {traceback.format_exc()}")
+            return jsonify({'status': 'error', 'error': str(e)}), 500
+
+    @app.route('/api/debug', methods=['GET'])
+    def debug_info():
+        """Informações de debug da aplicação"""
+        if app.debug:
+            return jsonify({
+                'flask_debug': app.debug,
+                'timestamp': datetime.now().isoformat(),
+                'note': 'Dados de sessão e mensagens não estão mais em memória para o chat web.'
+            })
+        else:
+            return jsonify({'error': 'Debug não habilitado'}), 403
