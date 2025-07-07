@@ -16,10 +16,10 @@ def webhook():
         print(f"Chat ID: {chat_id}, Texto: {mensagem}", file=sys.stderr)
 
         try:
-            inserir_mensagem(chat_id, "user", mensagem)
-            historico = buscar_historico(chat_id)
+            inserir_mensagem(str(chat_id), "user", mensagem)
+            historico = buscar_historico(str(chat_id))
             resposta = gerar_resposta(historico)
-            inserir_mensagem(chat_id, "assistant", resposta)
+            inserir_mensagem(str(chat_id), "assistant", resposta)
 
             print("Resposta gerada:", resposta, file=sys.stderr)
             enviar_mensagem_telegram(chat_id, resposta)
