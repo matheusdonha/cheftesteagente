@@ -6,6 +6,7 @@ from psycopg2 import pool
 from dotenv import load_dotenv
 from openai import OpenAI
 from config import OPENAI_API_KEY
+from psycopg2.extras import Json
 from urllib.parse import urlparse, quote_plus # Importe urlparse e quote_plus
 
 load_dotenv()  # Carrega variáveis de ambiente uma vez no início
@@ -73,11 +74,13 @@ def enviar_mensagem_telegram(chat_id, texto):
 def inserir_mensagem(user_id, role, message_content):
     conn = None
     cur = None
+    if isinstance(message_content, str):
+        message_content = {"content": message_content}
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""INSERT INTO tabelademensagens(user_id, role, messages) VALUES (%s, %s, %s)""",
-                    (user_id, role, message_content))
+                    (user_id, role,Json(message_content)))
         conn.commit()
         print(f"Mensagem inserida para user_id: {user_id}, role: {role}")
     except psycopg2.Error as e: # Captura erros específicos do psycopg2
@@ -105,7 +108,15 @@ def buscar_historico(user_id):
         mensagens = cur.fetchall()
         mensagens.reverse()
         print(f"Histórico buscado para user_id: {user_id}")
-        return [{"role": role, "content": msg} for role, msg in mensagens]
+        historico=[]
+        for role, msg in mensagens:
+            # Se o conteúdo é um dicionário e tem a chave 'content',
+            # extraímos apenas o valor. Se for um objeto multimodal, ele já está no formato correto.
+            if isinstance(msg, dict) and 'content' in msg:
+                historico.append({"role": role, "content": msg['content']})
+            else:
+                historico.append({"role": role, "content": msg})
+        return historico
     except psycopg2.Error as e:
         print(f"ERRO DB: Falha ao buscar histórico para user_id {user_id}. Erro: {e}")
         raise

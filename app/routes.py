@@ -55,7 +55,7 @@ def webhook():
                         content = []
                         if caption:
                             content.append({"type": "text", "text": caption})
-                        content.append({"type": "image_url", "image_url": {"url": supabase_url}})
+                        content.append({"type": "image_url", "image_url": {"url": supabase_library_url}})
 
                         # 5. Inserir mensagem com conteúdo multimodal
                         inserir_mensagem(str(chat_id), "user", content)
