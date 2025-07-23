@@ -1,14 +1,19 @@
 import psycopg2
 import os
 import requests
+import sys
 from psycopg2 import pool
 from dotenv import load_dotenv
+from openai import OpenAI
+from config import OPENAI_API_KEY
 from urllib.parse import urlparse, quote_plus # Importe urlparse e quote_plus
 
 load_dotenv()  # Carrega variáveis de ambiente uma vez no início
 
 
 DB_PASSWORD = os.environ['SUPABASE_PASSWORD']
+TELEGRAM_TOKEN = os.environ['TELEGRAM_TOKEN']
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 # Cria o pool de conexões
@@ -135,3 +140,40 @@ def deletar_historico(user_id):
         if cur:
             cur.close()
         put_db_connection(conn)
+
+def get_file_url_telegram(file_id: str) -> str:
+    if not TELEGRAM_TOKEN:
+        print("TELEGRAM_TOKEN não configurado.", file=sys.stderr)
+        return None
+    get_file_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile?file_id={file_id}"
+    response = requests.get(get_file_url)
+    file_info = response.json()
+    if file_info.get('ok') and 'file_path' in file_info['result']:
+        file_path = file_info['result']['file_path']
+        return f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+    print(f"Erro ao obter file_path do Telegram para file_id {file_id}: {file_info}", file=sys.stderr)
+    return None
+
+def download_file(url: str, save_path: str):
+    try:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        with open(save_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"Arquivo baixado para: {save_path}")
+    except requests.exceptions.RequestException as e:
+        print(f"Erro ao baixar arquivo da URL {url}: {e}")
+        raise
+    except IOError as e:
+        print(f"Erro ao salvar arquivo em {save_path}: {e}")
+        raise
+
+def transcrever_audio(file_path):
+    with open(file_path, "rb") as audio_file:
+        transcription = client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file
+        )
+    return transcription.text
+
