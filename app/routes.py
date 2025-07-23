@@ -46,11 +46,11 @@ def webhook():
 
                     # 3. Upload para Supabase
                     supabase_file_name = f"telegram_photos/{file_id}.jpg"
-                    supabase_url = upload_file_to_supabase(temp_file_path, SUPABASE_BUCKET_NAME, supabase_file_name)
+                    supabase_library_url = upload_file_to_supabase(temp_file_path, SUPABASE_BUCKET_NAME, supabase_file_name)
 
                     # Removido o os.remove() daqui
 
-                    if supabase_url:
+                    if supabase_library_url:
                         # 4. Criar conteúdo multimodal
                         content = []
                         if caption:

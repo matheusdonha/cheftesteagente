@@ -5,15 +5,15 @@ from supabase import create_client, Client
 load_dotenv() # Carrega as variáveis do arquivo .env
 
 # Suas credenciais do Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_LIBRARY_URL = os.getenv("SUPABASE_LIBRARY_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
 # Verifica se as credenciais existem
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    raise ValueError("As variáveis de ambiente SUPABASE_URL e SUPABASE_ANON_KEY devem ser configuradas.")
+if not SUPABASE_LIBRARY_URL or not SUPABASE_ANON_KEY:
+    raise ValueError("As variáveis de ambiente SUPABASE_DATABASE_URL e SUPABASE_ANON_KEY devem ser configuradas.")
 
 # Inicializa o cliente Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase: Client = create_client(SUPABASE_LIBRARY_URL, SUPABASE_ANON_KEY)
 
 
 def upload_file_to_supabase(file_path: str, bucket_name: str, file_name: str) -> str:
