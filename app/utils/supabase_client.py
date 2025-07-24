@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 import os
 from supabase import create_client, Client
+import sys
 
 load_dotenv() # Carrega as variáveis do arquivo .env
 
@@ -24,19 +25,33 @@ def upload_file_to_supabase(file_path: str, bucket_name: str, file_name: str) ->
     :param bucket_name: O nome do bucket no Supabase.
     :param file_name: O nome que o arquivo terá no Supabase.
     :return: A URL pública do arquivo, ou None em caso de erro.
+    Se o arquivo já existir, ele será sobrescrito.
     """
     try:
         with open(file_path, 'rb') as f:
             # Faz o upload do arquivo
-            supabase.storage.from_(bucket_name).upload(file_name, f)
+            try:
+                supabase.storage.from_(bucket_name).upload(file_name, f)
+                print(f"Arquivo {file_name} carregado com sucesso.", file=sys.stderr)
 
-            # Obtém a URL pública do arquivo
+            except Exception as e:
+                # Se for um erro 409 (Duplicate), tenta atualizar/sobrescrever
+                # Note: Supabase Storage SDK pode retornar o erro de forma diferente
+                # então verificamos a mensagem para um 409
+                if "409" in str(e) or "Duplicate" in str(e):
+                    f.seek(0)  # Volta o ponteiro do arquivo para o início para re-leitura
+                    supabase.storage.from_(bucket_name).update(file_name, f)
+                    print(f"Arquivo {file_name} atualizado (sobrescrito) com sucesso.", file=sys.stderr)
+                else:
+                    raise e  # Re-lança outras exceções
+
+                # Obtém a URL pública do arquivo
             res = supabase.storage.from_(bucket_name).get_public_url(file_name)
 
             return res
 
     except Exception as e:
-        print(f"Erro ao fazer upload para o Supabase: {e}")
+        print(f"Erro ao fazer upload ou atualizar para o Supabase: {e}", file=sys.stderr)
         return None
 
 
