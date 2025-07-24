@@ -2,6 +2,7 @@ from flask import request, jsonify
 import sys
 from app import app
 import os
+import string
 from app.utils.supabase_client import upload_file_to_supabase
 from app.agent_logic import gerar_resposta
 from app.utils.helpers import inserir_mensagem, get_file_url_telegram, download_file,enviar_mensagem_telegram, buscar_historico, deletar_historico, transcrever_audio
@@ -56,8 +57,8 @@ def webhook():
                         content = []
                         if caption:
                             content.append({"type": "text", "text": caption})
-                        # Remove qualquer '?' ou '&' extra no final da URL antes de enviar para a OpenAI
-                        clean_supabase_url = supabase_library_url.split('?')[0].split('&')[0]
+                        # Remove qualquer '?' ou '&' extra no final da URL antes de enviar para a OpenAI ou demais pontuações
+                        clean_supabase_url = supabase_library_url.split('?')[0].split('&')[0].rstrip(string.punctuation)
                         content.append({"type": "image_url", "image_url": {"url": clean_supabase_url}})
 
                         # 5. Inserir mensagem com conteúdo multimodal
