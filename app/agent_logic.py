@@ -25,5 +25,9 @@ def gerar_resposta(historico):
         )
         return resposta.choices[0].message.content
     except Exception as e:
-        return "Desculpe, estou com dificuldades técnicas. Tente novamente em alguns minutos."
+        print(f"ERRO ao gerar resposta do agente: {e}", file=sys.stderr)
+        return f"Desculpe, estou com dificuldades técnicas. Tente novamente em alguns minutos."
+
+
+
 

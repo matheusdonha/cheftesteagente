@@ -21,6 +21,7 @@ def webhook():
             try:
                 inserir_mensagem(str(chat_id), "user", mensagem)
                 historico = buscar_historico(str(chat_id))
+                print(f"Histórico enviado para OpenAI: {historico}", file=sys.stderr)
                 resposta = gerar_resposta(historico)
                 inserir_mensagem(str(chat_id), "assistant", resposta)
                 print("Resposta gerada:", resposta, file=sys.stderr)
@@ -62,6 +63,7 @@ def webhook():
 
                         # 6. Buscar histórico e gerar resposta
                         historico = buscar_historico(str(chat_id))
+                        print(f"Histórico enviado para OpenAI: {historico}", file=sys.stderr)
                         resposta = gerar_resposta(historico)
 
                         # 7. Inserir resposta do assistente e enviar
@@ -97,6 +99,7 @@ def webhook():
                     inserir_mensagem(str(chat_id), "user", transcribed_text)
                     # 5. Gerar a resposta do agente
                     historico = buscar_historico(str(chat_id))
+                    print(f"Histórico enviado para OpenAI: {historico}", file=sys.stderr)
                     resposta = gerar_resposta(historico)
                     # 6. Inserir a resposta do assistente e enviar
                     inserir_mensagem(str(chat_id), "assistant", resposta)
