@@ -17,43 +17,28 @@ if not SUPABASE_LIBRARY_URL or not SUPABASE_ANON_KEY:
 supabase: Client = create_client(SUPABASE_LIBRARY_URL, SUPABASE_ANON_KEY)
 
 
-def upload_file_to_supabase(file_path: str, bucket_name: str, file_name: str) -> str:
+def upload_file_to_supabase(file_path: str, bucket_name: str, file_name: str) -> bool:
     """
-    Faz o upload de um arquivo para o Supabase Storage e retorna a URL pública.
-
-    :param file_path: O caminho do arquivo local a ser enviado.
-    :param bucket_name: O nome do bucket no Supabase.
-    :param file_name: O nome que o arquivo terá no Supabase.
-    :return: A URL pública do arquivo, ou None em caso de erro.
-    Se o arquivo já existir, ele será sobrescrito.
+    Faz o upload de um arquivo para o Supabase Storage.
+    Retorna True se o upload/update foi bem-sucedido, False caso contrário.
     """
     try:
         with open(file_path, 'rb') as f:
-            # Faz o upload do arquivo
             try:
                 supabase.storage.from_(bucket_name).upload(file_name, f)
                 print(f"Arquivo {file_name} carregado com sucesso.", file=sys.stderr)
-
             except Exception as e:
-                # Se for um erro 409 (Duplicate), tenta atualizar/sobrescrever
-                # Note: Supabase Storage SDK pode retornar o erro de forma diferente
-                # então verificamos a mensagem para um 409
                 if "409" in str(e) or "Duplicate" in str(e):
-                    f.seek(0)  # Volta o ponteiro do arquivo para o início para re-leitura
+                    f.seek(0)
                     supabase.storage.from_(bucket_name).update(file_name, f)
                     print(f"Arquivo {file_name} atualizado (sobrescrito) com sucesso.", file=sys.stderr)
                 else:
-                    raise e  # Re-lança outras exceções
-
-                # Obtém a URL pública do arquivo
-            res = supabase.storage.from_(bucket_name).get_public_url(file_name)
-
-            return res
-
+                    print(f"Erro ao fazer upload ou atualizar para o Supabase (fora do 409): {e}", file=sys.stderr)
+                    return False # Retorna False em caso de erro
+        return True # Retorna True se tudo ocorreu bem
     except Exception as e:
-        print(f"Erro ao fazer upload ou atualizar para o Supabase: {e}", file=sys.stderr)
-        return None
-
+        print(f"Erro geral ao fazer upload para o Supabase: {e}", file=sys.stderr)
+        return False # Retorna False em caso de erro
 
 def get_public_url(bucket_name: str, file_name: str) -> str:
     """

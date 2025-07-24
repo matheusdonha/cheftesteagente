@@ -3,7 +3,7 @@ import sys
 from app import app
 import os
 import string
-from app.utils.supabase_client import upload_file_to_supabase
+from app.utils.supabase_client import upload_file_to_supabase, SUPABASE_LIBRARY_URL
 from app.agent_logic import gerar_resposta
 from app.utils.helpers import inserir_mensagem, get_file_url_telegram, download_file,enviar_mensagem_telegram, buscar_historico, deletar_historico, transcrever_audio
 
@@ -48,18 +48,19 @@ def webhook():
 
                     # 3. Upload para Supabase
                     supabase_file_name = f"telegram_photos/{file_id}.jpg"
-                    supabase_library_url = upload_file_to_supabase(temp_file_path, SUPABASE_BUCKET_NAME, supabase_file_name)
+                    # Chama a função de upload que agora retorna True/False
+                    upload_success = upload_file_to_supabase(temp_file_path, SUPABASE_BUCKET_NAME, supabase_file_name)
 
-                    # Removido o os.remove() daqui
+                    if upload_success:
+                        # CONSTRÓI A URL PÚBLICA MANUALMENTE AQUI
+                        # Substitua 'SUPABASE_URL' pela sua variável que contém 'https://ohwzezjffhjhetzsnjdd.supabase.co'
+                        supabase_public_url = f"{SUPABASE_LIBRARY_URL}/storage/v1/object/public/{SUPABASE_BUCKET_NAME}/{supabase_file_name}"
 
-                    if supabase_library_url:
-                        # 4. Criar conteúdo multimodal
                         content = []
                         if caption:
                             content.append({"type": "text", "text": caption})
-                        # Remove qualquer '?' ou '&' extra no final da URL antes de enviar para a OpenAI ou demais pontuações
-                        clean_supabase_url = supabase_library_url.split('?')[0].split('&')[0].rstrip(string.punctuation)
-                        content.append({"type": "image_url", "image_url": {"url": clean_supabase_url}})
+                        content.append(
+                            {"type": "image_url", "image_url": {"url": supabase_public_url}})  # Usa a URL construída
 
                         # 5. Inserir mensagem com conteúdo multimodal
                         inserir_mensagem(str(chat_id), "user", content)
