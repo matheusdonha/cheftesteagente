@@ -56,7 +56,9 @@ def webhook():
                         content = []
                         if caption:
                             content.append({"type": "text", "text": caption})
-                        content.append({"type": "image_url", "image_url": {"url": supabase_library_url}})
+                        # Remove qualquer '?' ou '&' extra no final da URL antes de enviar para a OpenAI
+                        clean_supabase_url = supabase_library_url.split('?')[0].split('&')[0]
+                        content.append({"type": "image_url", "image_url": {"url": clean_supabase_url}})
 
                         # 5. Inserir mensagem com conteúdo multimodal
                         inserir_mensagem(str(chat_id), "user", content)
@@ -91,12 +93,16 @@ def webhook():
                 audio_url_telegram = get_file_url_telegram(file_id)
                 if audio_url_telegram:
                     # 2. Baixar o arquivo (vamos usar .ogg, que é comum para voz)
+                    print ("Url de áudio temporário do telegram foi pega")
                     temp_file_path = f"/tmp/{file_id}.ogg"
                     download_file(audio_url_telegram, temp_file_path)
+                    print("Url de áudio temporário do telegram foi baixada")
                     # 3. Transcrever o áudio
                     transcribed_text = transcrever_audio(temp_file_path)
+                    print("Url de áudio temporário do telegram foi trancrita")
                     # 4. Inserir a mensagem transcrita no histórico (como texto)
                     inserir_mensagem(str(chat_id), "user", transcribed_text)
+                    print("Transcrição foi inserida no histórico")
                     # 5. Gerar a resposta do agente
                     historico = buscar_historico(str(chat_id))
                     print(f"Histórico enviado para OpenAI: {historico}", file=sys.stderr)
