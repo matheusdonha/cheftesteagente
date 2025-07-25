@@ -122,6 +122,33 @@ def webhook():
                 if temp_file_path and os.path.exists(temp_file_path):
                     os.remove(temp_file_path)
 
+        elif "voice" in data["message"]: # <<< NOVO BLOCO PARA MENSAGENS DE VOZ
+            voice = data['message']['voice']
+            file_id = voice['file_id']
+            print(f"Chat ID: {chat_id}, Voice File ID: {file_id}", file=sys.stderr)
+            temp_file_path = None
+            try:
+                voice_url_telegram = get_file_url_telegram(file_id)
+                if voice_url_telegram:
+                    temp_file_path = f"/tmp/{file_id}.ogg" # Mensagens de voz geralmente são .ogg
+                    download_file(voice_url_telegram, temp_file_path)
+                    transcribed_text = transcrever_audio(temp_file_path)
+                    print(f"Texto transcrito da VOZ: {transcribed_text}", file=sys.stderr) # Debug print
+                    inserir_mensagem(str(chat_id), "user", transcribed_text)
+                    historico = buscar_historico(str(chat_id))
+                    print(f'Histórico enviado para OpenAI: {historico}', file=sys.stderr)
+                    resposta = gerar_resposta(historico)
+                    inserir_mensagem(str(chat_id), "assistant", resposta)
+                    enviar_mensagem_telegram(chat_id, resposta)
+                else:
+                    enviar_mensagem_telegram(chat_id, "Desculpe, não consegui obter sua mensagem de voz.")
+            except Exception as e:
+                print(f"ERRO no processamento da mensagem de voz: {e}", file=sys.stderr)
+                enviar_mensagem_telegram(chat_id, "Desculpe, ocorreu um erro ao processar sua mensagem de voz.")
+            finally:
+                if temp_file_path and os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+
         elif "video" in data["message"]:
             video_file_id = data['message']['video']['file_id']
             caption = data['message'].get('caption', '')
