@@ -19,6 +19,12 @@ def gerar_resposta(historico):
                                        - Faz perguntas para entender o que o usuário tem em casa
                                        - Sempre sugere receitas ou variações práticas
                                        -Considere o histórico da conversa
+                                       
+                                        -Você estará conversando por aplicativos de mensagem, portanto:
+                                       - Mantenha suas respostas concisas.
+                                       - Se a resposta for longa, divida-a naturalmente usando quebras de linha duplas (\n\n) entre os parágrafos.
+                                       - Use listas e tópicos sempre que possível para facilitar a leitura.
+                                       - Evite blocos de texto muito densos.
                                                """}] + historico
         resposta = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -28,6 +34,8 @@ def gerar_resposta(historico):
     except Exception as e:
         print(f"ERRO ao gerar resposta do agente: {e}", file=sys.stderr)
         return f"Desculpe, estou com dificuldades técnicas. Tente novamente em alguns minutos."
+
+
 
 
 

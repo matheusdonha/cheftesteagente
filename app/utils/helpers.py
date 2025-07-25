@@ -188,3 +188,14 @@ def transcrever_audio(file_path):
         )
     return transcription.text
 
+def split_long_message(message: str) -> list[str]:
+    """
+    Divide uma mensagem em partes APENAS onde houver quebras de linha duplas (\\n\\n).
+    Cada parágrafo resultante será uma parte, independentemente de seu comprimento.
+    Se não houver \\n\\n, retorna a mensagem inteira como uma única parte.
+    """
+
+    parts = message.split('\n\n')
+
+    # Limpa espaços em branco excessivos e filtra partes vazias
+    return [p.strip() for p in parts if p.strip()]

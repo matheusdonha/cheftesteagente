@@ -5,10 +5,11 @@ import os
 import string
 from app.utils.supabase_client import upload_file_to_supabase, SUPABASE_LIBRARY_URL
 from app.agent_logic import gerar_resposta
-from app.utils.helpers import inserir_mensagem, get_file_url_telegram, download_file,enviar_mensagem_telegram, buscar_historico, deletar_historico, transcrever_audio
+from app.utils.helpers import inserir_mensagem, get_file_url_telegram, download_file,enviar_mensagem_telegram, buscar_historico, deletar_historico, transcrever_audio, split_long_message
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 SUPABASE_BUCKET_NAME = "chat-media"
+
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -26,7 +27,9 @@ def webhook():
                 resposta = gerar_resposta(historico)
                 inserir_mensagem(str(chat_id), "assistant", resposta)
                 print("Resposta gerada:", resposta, file=sys.stderr)
-                enviar_mensagem_telegram(chat_id, resposta)
+                mensagens_formatadas= split_long_message(resposta)
+                for msg in mensagens_formatadas:
+                    enviar_mensagem_telegram(chat_id, msg)
 
             except Exception as e:
                 print("Erro no processamento:", e, file=sys.stderr)
