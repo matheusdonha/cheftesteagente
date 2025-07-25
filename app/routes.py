@@ -72,10 +72,11 @@ def webhook():
                         historico = buscar_historico(str(chat_id))
                         print(f"Histórico enviado para OpenAI: {historico}", file=sys.stderr)
                         resposta = gerar_resposta(historico)
-
-                        # 7. Inserir resposta do assistente e enviar
                         inserir_mensagem(str(chat_id), "assistant", resposta)
-                        enviar_mensagem_telegram(chat_id, resposta)
+
+                        mensagens_formatadas = split_long_message(resposta)
+                        for msg in mensagens_formatadas:
+                            enviar_mensagem_telegram(chat_id, msg)
                     else:
                         enviar_mensagem_telegram(chat_id, "Desculpe, não consegui armazenar a imagem.")
                 else:
@@ -114,7 +115,9 @@ def webhook():
                     resposta = gerar_resposta(historico)
                     # 6. Inserir a resposta do assistente e enviar
                     inserir_mensagem(str(chat_id), "assistant", resposta)
-                    enviar_mensagem_telegram(chat_id, resposta)
+                    mensagens_formatadas = split_long_message(resposta)
+                    for msg in mensagens_formatadas:
+                        enviar_mensagem_telegram(chat_id, msg)
                 else:
                     enviar_mensagem_telegram(chat_id, "Desculpe, não consegui obter seu áudio do Telegram.")
             except Exception as e:
@@ -142,7 +145,9 @@ def webhook():
                     print(f'Histórico enviado para OpenAI: {historico}', file=sys.stderr)
                     resposta = gerar_resposta(historico)
                     inserir_mensagem(str(chat_id), "assistant", resposta)
-                    enviar_mensagem_telegram(chat_id, resposta)
+                    mensagens_formatadas = split_long_message(resposta)
+                    for msg in mensagens_formatadas:
+                        enviar_mensagem_telegram(chat_id, msg)
                 else:
                     enviar_mensagem_telegram(chat_id, "Desculpe, não consegui obter sua mensagem de voz.")
             except Exception as e:
